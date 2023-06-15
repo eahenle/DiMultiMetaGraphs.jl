@@ -1,14 +1,14 @@
 ### A Pluto.jl notebook ###
-# v0.19.26
+# v0.19.25
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ a8709375-d4bc-4944-93d9-8548819b0810
-using MolecularGraph, MolecularGraphKernels, PlutoUI
+using Match, MolecularGraph, MolecularGraphKernels, PlutoTest, PlutoUI
 
 # ╔═╡ d5095140-0b9e-11ee-1e3f-0155f21fbc52
-using Graphs, MetaGraphs, Multigraphs
+using EuclidGraphs, Graphs, MetaGraphs, Multigraphs
 
 # ╔═╡ 0f829b8b-c339-4384-8e14-9062ab133d54
 TableOfContents(title="DiMultiMetaGraphs")
@@ -22,7 +22,9 @@ md"""
 
 # ╔═╡ 50fa2ca2-8cce-4a5a-9bbe-019f4e274ac4
 md"""
-There are packages for graphs
+There are Julia packages for directed metagraphs and directed multigraphs, but not for directed multi meta graphs.
+
+`MetaGraphs.DiMetaGraph` $+$ `Multigraphs.DiMultiGraph` $=$ `DiMultiMetaGraphs.DiMultiMetaGraph`
 """
 
 # ╔═╡ 9123e616-9e1c-4acf-960e-29e2513ca84c
@@ -124,7 +126,12 @@ end;
 # ╔═╡ 3d156fa6-fc27-4579-a843-1c9fa9711358
 begin
 	import Graphs.add_edge!
-	function add_edge!(g::DMMG, v::Int, w::Int, d::NamedTuple=(;))
+	function add_edge!(
+		g::DMMG, 
+		v::Int, 
+		w::Int, 
+		d::NamedTuple=(; weight=g.defaultweight, stochastic=false)
+	)
 		ep = has_edge(g, v, w) ? push!(props(g, v, w), d) : [d]
 		add_edge!(g.graph, v, w)
 		g.eprops[SimpleEdge(v, w)] = ep
@@ -136,25 +143,91 @@ md"""
 # Sandbox
 """
 
+# ╔═╡ 81364a18-7993-44f8-b9e2-7d0c99a6614a
+md"""
+## Color Settings
+"""
+
+# ╔═╡ a589f4d1-083a-44ef-89e6-3cfa5273a744
+node_color(node) = @match node.features[node.idx] begin
+	1 => "green"
+	2 => "orange"
+	3 => "red"
+	4 => "yellow"
+	_ => "gray"
+end;
+
+# ╔═╡ 900e0e88-d6d2-4381-beee-c16dc812325e
+node_style(node) = NodeStyle(
+	inner_fill=node_color(node),
+	font_color="black",
+	stroke=node_color(node),
+	value=(node) -> node.features[node.idx]
+);
+
+# ╔═╡ 55a2078a-f049-4dab-ae6c-00d673c3c8f1
+edge_style(edge) = EdgeStyle(
+	directed_stroke = "#F00",
+	arrow_color = edge.features[edge.idx],
+	undirected_stroke = "#000"
+);
+
+# ╔═╡ 5eb4e3a7-eb93-4123-a9c0-722f604c1ebd
+md"""
+## Example Case
+"""
+
+# ╔═╡ fb2ebe18-5d3a-41df-afd5-303df6152b34
+md"""
+Two monomers:
+"""
+
+# ╔═╡ c1859b48-3d70-4972-9fad-5b0ae3761490
+md"""
+The nodes are also connected in a ring topology by stochastic edges, to define a block co-polymer:
+"""
+
 # ╔═╡ a8963628-ed8a-428b-b0b1-4f79d1371c15
 begin
 	# define graph w/ node count
 	g = DMMG(4)
+	
 	# bonds
-	add_edge!(g, 1, 2, (; weight=1.))
+	add_edge!(g, 1, 2,)
 	add_edge!(g, 2, 1)
 	add_edge!(g, 3, 4)
 	add_edge!(g, 4, 3)
+	
 	# stochastic edges
-	add_edge!(g, 1, 4)
-	add_edge!(g, 4, 1)
-	add_edge!(g, 2, 3)
-	add_edge!(g, 3, 2)
-	add_edge!(g, 3, 4)
-	add_edge!(g, 4, 3)
-	add_edge!(g, 1, 2, (; weight=0.95))
-	add_edge!(g, 2, 1)
+	add_edge!(g, 1, 4, (; weight=0.05, stochastic=true))
+	add_edge!(g, 4, 1, (; weight=0.05, stochastic=true))
+	add_edge!(g, 2, 3, (; weight=0.05, stochastic=true))
+	add_edge!(g, 3, 2, (; weight=0.05, stochastic=true))
+	add_edge!(g, 3, 4, (; weight=0.95, stochastic=true))
+	add_edge!(g, 4, 3, (; weight=0.95, stochastic=true))
+	add_edge!(g, 1, 2, (; weight=0.95, stochastic=true))
+	add_edge!(g, 2, 1, (; weight=0.95, stochastic=true))
 end;
+
+# ╔═╡ 493de664-3367-48a4-ad61-d6e9962da0eb
+EuclidGraph(
+	[(0, -50), (0, 50)], 
+	adj_mat=adjacency_matrix(g)[1:2, 1:2],
+	node_style=node_style,
+)([1, 2]),
+EuclidGraph(
+	[(0, -50), (0, 50)], 
+	adj_mat=adjacency_matrix(g)[3:4, 3:4],
+	node_style=node_style
+)([3, 4])
+
+# ╔═╡ e6b7166d-27cb-4aea-bf8a-3135de425750
+EuclidGraph(
+	[(-50, -50), (-50, 50), (50, 50), (50, -50)], 
+	adj_mat=adjacency_matrix(g),
+	node_style=node_style,
+	edge_style=edge_style
+)(1:4, 1:4)
 
 # ╔═╡ 25ec546f-6194-40ee-a0c1-d34823738c6f
 g.eprops
@@ -162,25 +235,51 @@ g.eprops
 # ╔═╡ d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
 g.graph.adjlist
 
-# ╔═╡ aa146e28-0301-49f1-a45c-0a19143ed8a5
-props(g, 1, 2)[1][:weight]
+# ╔═╡ b6c1dc1d-f37c-4289-a308-b48593722aeb
+@test nv(g) == 4
+
+# ╔═╡ a885878d-b0b4-4087-b5f0-03cf75e928c5
+md"""
+`8` edges because they are keyed only on the node pairs.
+"""
+
+# ╔═╡ 3443f0ae-a294-40d7-a828-c29c1455f62d
+@test ne(g) == 8
+
+# ╔═╡ 1bd05dba-c0d1-4d5a-b068-b2c152979477
+collect(edges(g))
+
+# ╔═╡ dfd9666e-5b82-4499-94d2-29df2a35fb78
+@test vertices(g) |> sort == [1, 2, 3, 4]
+
+# ╔═╡ 6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
+@test has_vertex(g, 3)
+
+# ╔═╡ 865b56ec-56a7-4f01-b102-da0c014c1f91
+@test ! has_vertex(g, 9)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+EuclidGraphs = "6d00f6e2-8806-480a-ab08-d5e107e6bfed"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+Match = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
 MetaGraphs = "626554b9-1ddb-594c-aa3c-2596fe9399a5"
 MolecularGraph = "6c89ec66-9cd8-5372-9f91-fabc50dd27fd"
 MolecularGraphKernels = "bf3818bd-b6bb-4954-8baa-32c32282e633"
 Multigraphs = "7ebac608-6c66-46e6-9856-b5f43e107bac"
+PlutoTest = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 
 [compat]
+EuclidGraphs = "~0.1.3"
 Graphs = "~1.8.0"
+Match = "~1.2.0"
 MetaGraphs = "~0.7.2"
 MolecularGraph = "~0.13.0"
 MolecularGraphKernels = "~0.9.0"
 Multigraphs = "~0.3.0"
+PlutoTest = "~0.2.2"
 PlutoUI = "~0.7.51"
 """
 
@@ -190,7 +289,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.1"
 manifest_format = "2.0"
-project_hash = "0e96a5fe5692b3fca23c2b00eaec01576e102c83"
+project_hash = "3756c5a48d463b7f98dc6197af1c33b8a730d0e3"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -314,11 +413,23 @@ deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.6.0"
 
+[[deps.EuclidGraphs]]
+deps = ["EzXML", "LinearAlgebra", "SnoopPrecompile", "Test"]
+git-tree-sha1 = "567f27a565f4fc6e38d6ba856a8ba365632952c7"
+uuid = "6d00f6e2-8806-480a-ab08-d5e107e6bfed"
+version = "0.1.3"
+
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
+
+[[deps.EzXML]]
+deps = ["Printf", "XML2_jll"]
+git-tree-sha1 = "0fa3b52a04a4e210aeb1626def9c90df3ae65268"
+uuid = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
+version = "1.1.0"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
@@ -543,6 +654,11 @@ version = "0.5.10"
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
+[[deps.Match]]
+git-tree-sha1 = "1d9bc5c1a6e7ee24effb93f175c9342f9154d97f"
+uuid = "7eb4fadd-790c-5f42-8a69-bfa0b872bfbf"
+version = "1.2.0"
+
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
@@ -660,6 +776,12 @@ deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.9.0"
 
+[[deps.PlutoTest]]
+deps = ["HypertextLiteral", "InteractiveUtils", "Markdown", "Test"]
+git-tree-sha1 = "17aa9b81106e661cffa1c4c36c17ee1c50a86eda"
+uuid = "cb4044da-4d16-4ffa-a6a3-8cad7f73ebdc"
+version = "0.2.2"
+
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
 git-tree-sha1 = "b478a748be27bd2f2c73a7690da219d0844db305"
@@ -745,6 +867,12 @@ deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.4"
+
+[[deps.SnoopPrecompile]]
+deps = ["Preferences"]
+git-tree-sha1 = "e760a70afdcd461cf01a575947738d359234665c"
+uuid = "66db9d55-30c0-4569-8b51-7e840670fc0c"
+version = "1.0.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -951,7 +1079,7 @@ version = "17.4.0+0"
 # ╠═d5095140-0b9e-11ee-1e3f-0155f21fbc52
 # ╠═0f829b8b-c339-4384-8e14-9062ab133d54
 # ╟─818cb44e-8fa5-4ca3-b2a8-b6d4d9bde62c
-# ╠═50fa2ca2-8cce-4a5a-9bbe-019f4e274ac4
+# ╟─50fa2ca2-8cce-4a5a-9bbe-019f4e274ac4
 # ╟─9123e616-9e1c-4acf-960e-29e2513ca84c
 # ╟─04abe64b-1170-4003-a923-7a762b04b632
 # ╟─aca0b94a-184c-489e-bfce-733896d20e81
@@ -970,9 +1098,24 @@ version = "17.4.0+0"
 # ╟─02de3014-54fa-4825-9da7-80f6f3ad6eeb
 # ╠═99e1049c-9e5d-451a-96a2-f85880306266
 # ╟─98489550-ea65-46f1-97d9-83ef94598284
+# ╟─81364a18-7993-44f8-b9e2-7d0c99a6614a
+# ╠═a589f4d1-083a-44ef-89e6-3cfa5273a744
+# ╠═900e0e88-d6d2-4381-beee-c16dc812325e
+# ╠═55a2078a-f049-4dab-ae6c-00d673c3c8f1
+# ╟─5eb4e3a7-eb93-4123-a9c0-722f604c1ebd
+# ╟─fb2ebe18-5d3a-41df-afd5-303df6152b34
+# ╠═493de664-3367-48a4-ad61-d6e9962da0eb
+# ╟─c1859b48-3d70-4972-9fad-5b0ae3761490
+# ╠═e6b7166d-27cb-4aea-bf8a-3135de425750
 # ╠═a8963628-ed8a-428b-b0b1-4f79d1371c15
 # ╠═25ec546f-6194-40ee-a0c1-d34823738c6f
 # ╠═d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
-# ╠═aa146e28-0301-49f1-a45c-0a19143ed8a5
+# ╠═b6c1dc1d-f37c-4289-a308-b48593722aeb
+# ╟─a885878d-b0b4-4087-b5f0-03cf75e928c5
+# ╠═3443f0ae-a294-40d7-a828-c29c1455f62d
+# ╠═1bd05dba-c0d1-4d5a-b068-b2c152979477
+# ╠═dfd9666e-5b82-4499-94d2-29df2a35fb78
+# ╠═6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
+# ╠═865b56ec-56a7-4f01-b102-da0c014c1f91
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
