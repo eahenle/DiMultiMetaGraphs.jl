@@ -27,29 +27,25 @@ There are Julia packages for directed metagraphs and directed multigraphs, but n
 `MetaGraphs.DiMetaGraph` $+$ `Multigraphs.DiMultiGraph` $=$ `DiMultiMetaGraphs.DiMultiMetaGraph`
 """
 
-# ╔═╡ 9123e616-9e1c-4acf-960e-29e2513ca84c
-md"""
-# Dependencies
-"""
-
 # ╔═╡ 04abe64b-1170-4003-a923-7a762b04b632
 md"""
-# Type
+# Types
 """
 
 # ╔═╡ aca0b94a-184c-489e-bfce-733896d20e81
 md"""
-## Definition
+## Definitions
 """
 
 # ╔═╡ fd2cee34-996a-4cb7-b909-f2fc121e9ad5
-mutable struct DiMultiMetaGraph <: AbstractMetaGraph{Float64}
+struct DiMultiMetaGraph <: AbstractMetaGraph{Int}
 	graph::DiMultigraph
 	weightfield::Symbol
 	defaultweight::Float64
 	gprops::Dict
 	vprops::Dict
 	eprops::Dict
+	indices::Vector{Int}
 	
 	DiMultiMetaGraph(nv::Int=0) = new(
 		DiMultigraph(SimpleDiGraph{Int}(nv)),
@@ -57,9 +53,17 @@ mutable struct DiMultiMetaGraph <: AbstractMetaGraph{Float64}
 		1.,
 		Dict(),
 		Dict(),
-		Dict()
+		Dict(),
+		[1:nv...]
 	)
 end
+
+# ╔═╡ a1aa00dc-374d-4dd3-bcef-510241f03587
+@kwdef struct EdgeProps
+	weight::Float64=1.
+	stochastic::Bool=false
+	label::Float64=weight
+end;
 
 # ╔═╡ 9be55ba9-8135-4276-be5a-14547555a24e
 md"""
@@ -121,22 +125,89 @@ begin
 	import MetaGraphs.props
 	import Graphs.SimpleGraphs.SimpleEdge
 	props(g::DMMG, e::SimpleEdge) = g.eprops[e]
+	props(g::DMMG, e::MultipleEdge) = props(g, SimpleEdge(e))
 end;
 
 # ╔═╡ 3d156fa6-fc27-4579-a843-1c9fa9711358
 begin
 	import Graphs.add_edge!
+	add_edge!(g::DMMG, v::Int, w::Int; kwargs...) = 
+		add_edge!(g, v, w, EdgeProps(; kwargs...))
 	function add_edge!(
 		g::DMMG, 
 		v::Int, 
 		w::Int, 
-		d::NamedTuple=(; weight=g.defaultweight, stochastic=false)
+		d::EdgeProps=EdgeProps(; weight=g.defaultweight)
 	)
 		ep = has_edge(g, v, w) ? push!(props(g, v, w), d) : [d]
 		add_edge!(g.graph, v, w)
 		g.eprops[SimpleEdge(v, w)] = ep
 	end
 end;
+
+# ╔═╡ 6729fa27-a4b6-4e25-b156-04ac08a6c59d
+md"""
+### `get_prop`
+"""
+
+# ╔═╡ 2c3cb4b0-cbe7-4450-97a9-98cdeec50df3
+begin
+	import MetaGraphs.get_prop
+	get_prop(g::DMMG, e::MultipleEdge, key::Symbol) = 
+		[getproperty(x, key) for x in props(g, e)]
+end;
+
+# ╔═╡ b425b333-8075-462e-82f3-4ca381a4d0a4
+md"""
+# Implementation Tests
+"""
+
+# ╔═╡ a8963628-ed8a-428b-b0b1-4f79d1371c15
+begin
+	# define graph w/ node count
+	g = DMMG(4)
+
+	# set node labels
+	for v in vertices(g)
+		set_prop!(g, v, :label, v + 1)
+	end
+	
+	# bonds
+	add_edge!(g, 1, 2)
+	add_edge!(g, 2, 1)
+	add_edge!(g, 3, 4)
+	add_edge!(g, 4, 3)
+	
+	# stochastic edges
+	add_edge!(g, 1, 4; weight=0.05, stochastic=true)
+	add_edge!(g, 4, 1; weight=0.05, stochastic=true)
+	add_edge!(g, 2, 3; weight=0.05, stochastic=true)
+	add_edge!(g, 3, 2; weight=0.05, stochastic=true)
+	add_edge!(g, 3, 4; weight=0.95, stochastic=true)
+	add_edge!(g, 4, 3; weight=0.95, stochastic=true)
+	add_edge!(g, 1, 2; weight=0.95, stochastic=true)
+	add_edge!(g, 2, 1; weight=0.95, stochastic=true)
+end;
+
+# ╔═╡ b6c1dc1d-f37c-4289-a308-b48593722aeb
+@test nv(g) == 4
+
+# ╔═╡ a885878d-b0b4-4087-b5f0-03cf75e928c5
+md"""
+`8` edges because they are keyed only on the node pairs.
+"""
+
+# ╔═╡ 3443f0ae-a294-40d7-a828-c29c1455f62d
+@test ne(g) == 8
+
+# ╔═╡ dfd9666e-5b82-4499-94d2-29df2a35fb78
+@test vertices(g) |> sort == [1, 2, 3, 4]
+
+# ╔═╡ 6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
+@test has_vertex(g, 3)
+
+# ╔═╡ 865b56ec-56a7-4f01-b102-da0c014c1f91
+@test ! has_vertex(g, 9)
 
 # ╔═╡ 98489550-ea65-46f1-97d9-83ef94598284
 md"""
@@ -146,6 +217,11 @@ md"""
 # ╔═╡ 81364a18-7993-44f8-b9e2-7d0c99a6614a
 md"""
 ## Color Settings
+"""
+
+# ╔═╡ 2f3a72ec-cdca-4a2c-af42-bfdfeab063b8
+md"""
+### Nodes
 """
 
 # ╔═╡ a589f4d1-083a-44ef-89e6-3cfa5273a744
@@ -161,9 +237,14 @@ end;
 node_style(node) = NodeStyle(
 	inner_fill=node_color(node),
 	font_color="black",
-	stroke=node_color(node),
+	stroke="black",
 	value=(node) -> node.features[node.idx]
 );
+
+# ╔═╡ 9d49e1d7-32b8-4970-a642-681d0c48ac93
+md"""
+### Edges
+"""
 
 # ╔═╡ 55a2078a-f049-4dab-ae6c-00d673c3c8f1
 edge_style(edge) = EdgeStyle(
@@ -182,33 +263,6 @@ md"""
 Two monomers:
 """
 
-# ╔═╡ c1859b48-3d70-4972-9fad-5b0ae3761490
-md"""
-The nodes are also connected in a ring topology by stochastic edges, to define a block co-polymer:
-"""
-
-# ╔═╡ a8963628-ed8a-428b-b0b1-4f79d1371c15
-begin
-	# define graph w/ node count
-	g = DMMG(4)
-	
-	# bonds
-	add_edge!(g, 1, 2,)
-	add_edge!(g, 2, 1)
-	add_edge!(g, 3, 4)
-	add_edge!(g, 4, 3)
-	
-	# stochastic edges
-	add_edge!(g, 1, 4, (; weight=0.05, stochastic=true))
-	add_edge!(g, 4, 1, (; weight=0.05, stochastic=true))
-	add_edge!(g, 2, 3, (; weight=0.05, stochastic=true))
-	add_edge!(g, 3, 2, (; weight=0.05, stochastic=true))
-	add_edge!(g, 3, 4, (; weight=0.95, stochastic=true))
-	add_edge!(g, 4, 3, (; weight=0.95, stochastic=true))
-	add_edge!(g, 1, 2, (; weight=0.95, stochastic=true))
-	add_edge!(g, 2, 1, (; weight=0.95, stochastic=true))
-end;
-
 # ╔═╡ 493de664-3367-48a4-ad61-d6e9962da0eb
 EuclidGraph(
 	[(0, -50), (0, 50)], 
@@ -221,6 +275,11 @@ EuclidGraph(
 	node_style=node_style
 )([3, 4])
 
+# ╔═╡ c1859b48-3d70-4972-9fad-5b0ae3761490
+md"""
+The nodes are also connected in a ring topology by stochastic edges, to define a block co-polymer:
+"""
+
 # ╔═╡ e6b7166d-27cb-4aea-bf8a-3135de425750
 EuclidGraph(
 	[(-50, -50), (-50, 50), (50, 50), (50, -50)], 
@@ -229,34 +288,20 @@ EuclidGraph(
 	edge_style=edge_style
 )(1:4, 1:4)
 
+# ╔═╡ a06204dd-bcca-428a-850e-8f8c8c587edd
+viz_graph(g)
+
 # ╔═╡ 25ec546f-6194-40ee-a0c1-d34823738c6f
 g.eprops
 
 # ╔═╡ d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
 g.graph.adjlist
 
-# ╔═╡ b6c1dc1d-f37c-4289-a308-b48593722aeb
-@test nv(g) == 4
-
-# ╔═╡ a885878d-b0b4-4087-b5f0-03cf75e928c5
-md"""
-`8` edges because they are keyed only on the node pairs.
-"""
-
-# ╔═╡ 3443f0ae-a294-40d7-a828-c29c1455f62d
-@test ne(g) == 8
-
 # ╔═╡ 1bd05dba-c0d1-4d5a-b068-b2c152979477
 collect(edges(g))
 
-# ╔═╡ dfd9666e-5b82-4499-94d2-29df2a35fb78
-@test vertices(g) |> sort == [1, 2, 3, 4]
-
-# ╔═╡ 6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
-@test has_vertex(g, 3)
-
-# ╔═╡ 865b56ec-56a7-4f01-b102-da0c014c1f91
-@test ! has_vertex(g, 9)
+# ╔═╡ 403ff14a-941a-47c7-9839-74ca222d8f6e
+incidence_matrix(g)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1080,10 +1125,10 @@ version = "17.4.0+0"
 # ╠═0f829b8b-c339-4384-8e14-9062ab133d54
 # ╟─818cb44e-8fa5-4ca3-b2a8-b6d4d9bde62c
 # ╟─50fa2ca2-8cce-4a5a-9bbe-019f4e274ac4
-# ╟─9123e616-9e1c-4acf-960e-29e2513ca84c
 # ╟─04abe64b-1170-4003-a923-7a762b04b632
 # ╟─aca0b94a-184c-489e-bfce-733896d20e81
 # ╠═fd2cee34-996a-4cb7-b909-f2fc121e9ad5
+# ╠═a1aa00dc-374d-4dd3-bcef-510241f03587
 # ╟─9be55ba9-8135-4276-be5a-14547555a24e
 # ╠═ea4195a1-c7bd-41f7-8768-094384bddfa9
 # ╟─7fd6d73b-df53-4dac-a940-4fc980e439b4
@@ -1097,25 +1142,32 @@ version = "17.4.0+0"
 # ╠═c027f493-3e72-48a1-bae4-cfce933041ac
 # ╟─02de3014-54fa-4825-9da7-80f6f3ad6eeb
 # ╠═99e1049c-9e5d-451a-96a2-f85880306266
+# ╟─6729fa27-a4b6-4e25-b156-04ac08a6c59d
+# ╠═2c3cb4b0-cbe7-4450-97a9-98cdeec50df3
+# ╟─b425b333-8075-462e-82f3-4ca381a4d0a4
+# ╠═a8963628-ed8a-428b-b0b1-4f79d1371c15
+# ╠═b6c1dc1d-f37c-4289-a308-b48593722aeb
+# ╟─a885878d-b0b4-4087-b5f0-03cf75e928c5
+# ╠═3443f0ae-a294-40d7-a828-c29c1455f62d
+# ╠═dfd9666e-5b82-4499-94d2-29df2a35fb78
+# ╠═6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
+# ╠═865b56ec-56a7-4f01-b102-da0c014c1f91
 # ╟─98489550-ea65-46f1-97d9-83ef94598284
 # ╟─81364a18-7993-44f8-b9e2-7d0c99a6614a
+# ╟─2f3a72ec-cdca-4a2c-af42-bfdfeab063b8
 # ╠═a589f4d1-083a-44ef-89e6-3cfa5273a744
 # ╠═900e0e88-d6d2-4381-beee-c16dc812325e
+# ╟─9d49e1d7-32b8-4970-a642-681d0c48ac93
 # ╠═55a2078a-f049-4dab-ae6c-00d673c3c8f1
 # ╟─5eb4e3a7-eb93-4123-a9c0-722f604c1ebd
 # ╟─fb2ebe18-5d3a-41df-afd5-303df6152b34
 # ╠═493de664-3367-48a4-ad61-d6e9962da0eb
 # ╟─c1859b48-3d70-4972-9fad-5b0ae3761490
 # ╠═e6b7166d-27cb-4aea-bf8a-3135de425750
-# ╠═a8963628-ed8a-428b-b0b1-4f79d1371c15
+# ╠═a06204dd-bcca-428a-850e-8f8c8c587edd
 # ╠═25ec546f-6194-40ee-a0c1-d34823738c6f
 # ╠═d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
-# ╠═b6c1dc1d-f37c-4289-a308-b48593722aeb
-# ╟─a885878d-b0b4-4087-b5f0-03cf75e928c5
-# ╠═3443f0ae-a294-40d7-a828-c29c1455f62d
 # ╠═1bd05dba-c0d1-4d5a-b068-b2c152979477
-# ╠═dfd9666e-5b82-4499-94d2-29df2a35fb78
-# ╠═6fd5ca90-d5d5-468d-9fa3-eb51c00673e3
-# ╠═865b56ec-56a7-4f01-b102-da0c014c1f91
+# ╠═403ff14a-941a-47c7-9839-74ca222d8f6e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
