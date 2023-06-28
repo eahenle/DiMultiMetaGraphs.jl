@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.25
+# v0.19.20
 
 using Markdown
 using InteractiveUtils
@@ -55,6 +55,16 @@ struct DiMultiMetaGraph <: AbstractMetaGraph{Int}
 		Dict(),
 		Dict(),
 		[1:nv...]
+	)
+
+	DiMultiMetaGraph(g::MetaGraph) = new(
+		DiMultigraph(SimpleDiGraph(g.graph)),
+		g.weightfield,
+		g.defaultweight,
+		g.gprops,
+		g.vprops,
+		g.eprops,
+		[1:nv(g)...]
 	)
 end
 
@@ -291,17 +301,20 @@ EuclidGraph(
 # ╔═╡ a06204dd-bcca-428a-850e-8f8c8c587edd
 viz_graph(g)
 
-# ╔═╡ 25ec546f-6194-40ee-a0c1-d34823738c6f
-g.eprops
+# ╔═╡ 6dde8a8d-cbe8-4eb4-bf9a-cc64e6cd09c5
+md"""
+## PVC
+"""
 
-# ╔═╡ d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
-g.graph.adjlist
+# ╔═╡ 43664049-928d-4016-9bf7-4e92dbe8b4ff
+vinyl_chloride = MetaGraph(smilestomol("CCCl"))
 
-# ╔═╡ 1bd05dba-c0d1-4d5a-b068-b2c152979477
-collect(edges(g))
-
-# ╔═╡ 403ff14a-941a-47c7-9839-74ca222d8f6e
-incidence_matrix(g)
+# ╔═╡ 55902e19-0c81-4166-ba88-0c3ea90e1db3
+pvc_rep1 = begin
+	local G = DMMG(vinyl_chloride)
+	add_edge!(G, 1, 1; weight=0.5, stochastic=true)
+	G
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1165,9 +1178,8 @@ version = "17.4.0+0"
 # ╟─c1859b48-3d70-4972-9fad-5b0ae3761490
 # ╠═e6b7166d-27cb-4aea-bf8a-3135de425750
 # ╠═a06204dd-bcca-428a-850e-8f8c8c587edd
-# ╠═25ec546f-6194-40ee-a0c1-d34823738c6f
-# ╠═d05ff10a-b8bb-40ac-af7a-eb4be91ce83e
-# ╠═1bd05dba-c0d1-4d5a-b068-b2c152979477
-# ╠═403ff14a-941a-47c7-9839-74ca222d8f6e
+# ╟─6dde8a8d-cbe8-4eb4-bf9a-cc64e6cd09c5
+# ╠═43664049-928d-4016-9bf7-4e92dbe8b4ff
+# ╠═55902e19-0c81-4166-ba88-0c3ea90e1db3
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
